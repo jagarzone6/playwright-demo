@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechShop — Playwright Practice</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0c0c0c; --surface: #161616; --surface2: #1f1f1f;
+      --border: #2a2a2a; --border2: #333;
+      --accent: #e8ff47; --accent-dim: rgba(232,255,71,0.10);
+      --text: #efefef; --muted: #888; --danger: #ff5f5f;
+      --green: #5dff9e; --focus-ring: #e8ff47;
+      --font-display: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --radius: 8px;
+    }
+
+    body { background: var(--bg); color: var(--text); font-family: var(--font-mono); min-height: 100vh; padding: 48px 24px 80px; }
+
+    /* ── SKIP LINK ── */
+    .skip-link {
+      position: absolute; top: -999px; left: 8px;
+      background: var(--accent); color: #000;
+      font-family: var(--font-mono); font-size: 0.82rem; font-weight: 500;
+      padding: 8px 16px; border-radius: var(--radius);
+      z-index: 9999; text-decoration: none;
+    }
+    .skip-link:focus { top: 8px; }
+
+    /* ── SCREEN-READER ONLY ── */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    /* ── FOCUS RING (global) ── */
+    :focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    /* ── HEADER ── */
+    header { max-width: 960px; margin: 0 auto 40px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
+    header h1 { font-family: var(--font-display); font-size: clamp(2rem,5vw,3rem); font-weight: 800; letter-spacing: -1px; line-height: 1; }
+    header h1 span { color: var(--accent); }
+    .badge { font-size: 0.68rem; color: var(--muted); border: 1px solid var(--border); padding: 4px 10px; border-radius: 99px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+    /* ── API LOG ── */
+    #api-log-bar { max-width: 960px; margin: 0 auto 28px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 16px; font-size: 0.72rem; color: var(--muted); display: flex; align-items: stretch; gap: 0; min-height: 42px; overflow: hidden; }
+    .log-method { display: flex; align-items: center; padding: 0 12px 0 0; font-weight: 500; font-size: 0.7rem; color: var(--accent); white-space: nowrap; border-right: 1px solid var(--border); margin-right: 14px; }
+    .log-spinner { width: 11px; height: 11px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; flex-shrink: 0; display: none; align-self: center; margin-right: 10px; }
+    #api-log-bar.loading .log-spinner { display: block; }
+    .log-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; align-self: center; margin-right: 10px; transition: background 0.3s; }
+    #api-log-bar.ok    .log-dot { background: var(--green); }
+    #api-log-bar.error .log-dot { background: var(--danger); }
+    #api-log-text { align-self: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #api-log-status { margin-left: auto; align-self: center; padding-left: 14px; font-weight: 500; white-space: nowrap; }
+    #api-log-bar.ok    #api-log-status { color: var(--green); }
+    #api-log-bar.error #api-log-status { color: var(--danger); }
+
+    /* ── CONTROLS ── */
+    .controls { max-width: 960px; margin: 0 auto 28px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-group.grow { flex: 1; min-width: 200px; }
+    .field-group label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+    input[data-testid="search"], select[data-testid="sort"] {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      font-family: var(--font-mono); font-size: 0.82rem; padding: 10px 14px;
+      border-radius: var(--radius); outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s; -webkit-appearance: none;
+    }
+    input[data-testid="search"]::placeholder { color: var(--muted); }
+    input[data-testid="search"]:focus, select[data-testid="sort"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
+    .select-wrap { position: relative; }
+    .select-wrap::after { content: '▾'; position: absolute; right: 12px; top: 65%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 0.72rem; }
+    select[data-testid="sort"] { padding-right: 32px; cursor: pointer; width: 100%; }
+    select[data-testid="sort"] option { background: var(--surface); }
+
+    /* ── STATUS BAR ── */
+    #products-status { max-width: 960px; margin: 0 auto 12px; font-size: 0.72rem; color: var(--muted); min-height: 18px; }
+
+    /* ── GRID ── */
+    [data-testid="products"] { max-width: 960px; margin: 0 auto 32px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+
+    /* Cards are <article> buttons — keyboard + click accessible */
+    .product {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; display: flex; flex-direction: column; gap: 8px;
+      cursor: pointer; text-align: left; width: 100%; font-family: var(--font-mono);
+      transition: border-color 0.2s, transform 0.2s, background 0.2s;
+      animation: fadeUp 0.3s ease both; position: relative; color: var(--text);
+    }
+    .product:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .product:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+    .product[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-dim); }
+    .product[aria-pressed="true"]::after { content: '✓'; position: absolute; top: 10px; right: 12px; color: var(--accent); font-size: 0.75rem; aria-hidden: true; }
+    .product .category { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .product .title { font-family: var(--font-display); font-size: 1rem; font-weight: 700; }
+    .product .price { font-size: 0.9rem; color: var(--accent); font-weight: 500; }
+    .product .stock-label { font-size: 0.7rem; }
+
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 500; }
+    .tag.in-stock  { background: rgba(93,255,158,0.12); color: var(--green); }
+    .tag.low-stock { background: rgba(255,200,60,0.12);  color: #ffc83c; }
+    .tag.out-stock { background: rgba(255,95,95,0.12);   color: var(--danger); }
+
+    .empty { grid-column: 1/-1; text-align: center; color: var(--muted); font-size: 0.85rem; padding: 48px; border: 1px dashed var(--border); border-radius: var(--radius); }
+
+    /* ── DETAIL ── */
+    #detail-section { max-width: 960px; margin: 0 auto; display: none; animation: fadeUp 0.35s ease both; }
+    #detail-section.visible { display: block; }
+    .detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+    .detail-header h2 { font-family: var(--font-display); font-size: 1rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+    .detail-header h2 span { color: var(--text); }
+    #btn-close-detail { background: none; border: 1px solid var(--border); color: var(--muted); font-family: var(--font-mono); font-size: 0.72rem; padding: 5px 12px; border-radius: 99px; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
+    #btn-close-detail:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* loading state indicator for the detail panel */
+    #detail-loading-msg { font-size: 0.75rem; color: var(--muted); margin-bottom: 10px; min-height: 18px; }
+
+    .table-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    table[data-testid="product-detail-table"] { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    table[data-testid="product-detail-table"] thead tr { background: var(--surface2); border-bottom: 1px solid var(--border); }
+    table[data-testid="product-detail-table"] th { text-align: left; padding: 12px 18px; font-size: 0.68rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    table[data-testid="product-detail-table"] tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+    table[data-testid="product-detail-table"] tbody tr:last-child { border-bottom: none; }
+    table[data-testid="product-detail-table"] tbody tr:hover { background: var(--surface2); }
+    table[data-testid="product-detail-table"] td { padding: 12px 18px; vertical-align: middle; }
+    td[data-testid="detail-field"] { color: var(--muted); font-size: 0.73rem; text-transform: uppercase; letter-spacing: 0.08em; width: 160px; }
+    td[data-testid="detail-value"] { font-weight: 500; }
+
+    .skel { display: inline-block; height: 12px; border-radius: 4px; background: var(--border2); animation: pulse 1.2s ease infinite; }
+
+    /* ── REDUCED MOTION ── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes spin   { to { transform:rotate(360deg); } }
+    @keyframes pulse  { 0%,100% { opacity:.4; } 50% { opacity:.9; } }
+  </style>
+</head>
+<body>
+
+  <!-- Skip navigation for keyboard users -->
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <!-- Visually hidden live regions announced by screen readers -->
+  <div
+    id="sr-status"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+    class="sr-only"
+  ></div>
+  <div
+    id="sr-alert"
+    role="alert"
+    aria-live="assertive"
+    aria-atomic="true"
+    class="sr-only"
+  ></div>
+
+  <header role="banner">
+    <h1>Tech<span aria-hidden="true">Shop</span><span class="sr-only">TechShop</span></h1>
+    <span class="badge" aria-label="Page purpose: Playwright practice">Playwright practice</span>
+  </header>
+
+  <!-- API activity log — polite live region visible on screen -->
+  <div
+    id="api-log-bar"
+    data-testid="api-log"
+    role="log"
+    aria-label="API request log"
+    aria-live="polite"
+    aria-atomic="false"
+  >
+    <span class="log-method" aria-hidden="true">GET</span>
+    <div class="log-spinner" aria-hidden="true"></div>
+    <div class="log-dot"    aria-hidden="true"></div>
+    <span id="api-log-text">Idle — waiting for interaction</span>
+    <span id="api-log-status" aria-hidden="true"></span>
+  </div>
+
+  <main id="main-content">
+
+    <!-- Controls -->
+    <div class="controls" role="search" aria-label="Product search and sort">
+
+      <div class="field-group grow">
+        <label for="search-input">Search products</label>
+        <input
+          id="search-input"
+          data-testid="search"
+          type="search"
+          placeholder="e.g. Keyboard, Monitor…"
+          autocomplete="off"
+          aria-label="Search products"
+          aria-controls="products-grid"
+          aria-describedby="products-status"
+        />
+      </div>
+
+      <div class="field-group">
+        <label for="sort-select">Sort by</label>
+        <div class="select-wrap">
+          <select
+            id="sort-select"
+            data-testid="sort"
+            aria-label="Sort products"
+            aria-controls="products-grid"
+          >
+            <option value="default">Default order</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="name-asc">Name: A → Z</option>
+            <option value="name-desc">Name: Z → A</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Result count — visible + referenced by aria-describedby -->
+    <p id="products-status" aria-live="polite" aria-atomic="true"></p>
+
+    <!-- Product grid -->
+    <div
+      id="products-grid"
+      data-testid="products"
+      role="list"
+      aria-label="Product catalogue"
+      aria-busy="false"
+    ></div>
+
+    <!-- Detail panel -->
+    <section
+      id="detail-section"
+      aria-label="Product details"
+      aria-live="polite"
+    >
+      <div class="detail-header">
+        <h2 id="detail-heading">
+          Details —
+          <span id="detail-title" data-testid="detail-title">—</span>
+        </h2>
+        <button
+          id="btn-close-detail"
+          data-testid="close-detail"
+          aria-label="Close product detail panel"
+          aria-controls="detail-section"
+        >
+          ✕ Close
+        </button>
+      </div>
+
+      <p id="detail-loading-msg" aria-live="polite" aria-atomic="true"></p>
+
+      <div class="table-wrap">
+        <table
+          data-testid="product-detail-table"
+          aria-labelledby="detail-heading"
+          aria-describedby="detail-loading-msg"
+        >
+          <caption class="sr-only">Detailed specifications for the selected product</caption>
+          <thead>
+            <tr>
+              <th scope="col">Field</th>
+              <th scope="col">Value</th>
+            </tr>
+          </thead>
+          <tbody id="detail-tbody" aria-busy="false"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    /* ── DATA ── */
+    const PRODUCTS = [
+      { id:1, title:"Mouse",       price:25,  category:"Peripherals", stock:120, lat:40.71,  lon:-74.01 },
+      { id:2, title:"Keyboard",    price:80,  category:"Peripherals", stock:45,  lat:51.51,  lon:-0.13  },
+      { id:3, title:"Monitor",     price:320, category:"Displays",    stock:8,   lat:48.85,  lon:2.35   },
+      { id:4, title:"Webcam",      price:65,  category:"Accessories", stock:0,   lat:35.68,  lon:139.69 },
+      { id:5, title:"Headset",     price:95,  category:"Audio",       stock:30,  lat:-33.87, lon:151.21 },
+      { id:6, title:"USB Hub",     price:35,  category:"Accessories", stock:200, lat:52.52,  lon:13.40  },
+      { id:7, title:"SSD 1TB",     price:110, category:"Storage",     stock:15,  lat:37.77,  lon:-122.42},
+      { id:8, title:"Mousepad XL", price:20,  category:"Peripherals", stock:90,  lat:55.75,  lon:37.62  },
+    ];
+
+    const EXTRA = {
+      1: { sku:"TK-MSE-001", brand:"LogiPro",    warranty:"1 year",   weight:"95g",   color:"Matte Black", interface:"USB-A / Bluetooth"  },
+      2: { sku:"TK-KBD-002", brand:"KeyMaster",  warranty:"2 years",  weight:"780g",  color:"Space Gray",  interface:"USB-C / Wireless"   },
+      3: { sku:"TK-MON-003", brand:"ViewTech",   warranty:"3 years",  weight:"4.2kg", color:"Silver",      interface:"HDMI / DisplayPort" },
+      4: { sku:"TK-WBC-004", brand:"StreamCam",  warranty:"1 year",   weight:"110g",  color:"White",       interface:"USB-C"              },
+      5: { sku:"TK-AUD-005", brand:"SoundForge", warranty:"2 years",  weight:"310g",  color:"Charcoal",    interface:"USB-A / 3.5mm"      },
+      6: { sku:"TK-HUB-006", brand:"ConnectX",   warranty:"1 year",   weight:"65g",   color:"Black",       interface:"USB-A 3.0 ×7"       },
+      7: { sku:"TK-SSD-007", brand:"SpeedDrive", warranty:"5 years",  weight:"50g",   color:"Aluminum",    interface:"NVMe PCIe 4.0"      },
+      8: { sku:"TK-MPD-008", brand:"DeskZen",    warranty:"6 months", weight:"350g",  color:"Dark Gray",   interface:"—"                  },
+    };
+    const CITIES = {1:"New York",2:"London",3:"Paris",4:"Tokyo",5:"Sydney",6:"Berlin",7:"San Francisco",8:"Moscow"};
+
+    /* ── LIVE REGION HELPERS ── */
+    const srStatus = document.getElementById("sr-status");
+    const srAlert  = document.getElementById("sr-alert");
+
+    function announce(msg, urgent = false) {
+      const el = urgent ? srAlert : srStatus;
+      el.textContent = "";                    // reset to re-trigger
+      requestAnimationFrame(() => el.textContent = msg);
+    }
+
+    /* ── API LOG UI ── */
+    const logBar    = document.getElementById("api-log-bar");
+    const logText   = document.getElementById("api-log-text");
+    const logStatus = document.getElementById("api-log-status");
+
+    function setLog(state, url, statusText) {
+      logBar.className = state;
+      logText.textContent = url;
+      logStatus.textContent = statusText || "";
+      // Also update aria-label so the log is properly described for AT
+      logBar.setAttribute("aria-label", `API request log: ${state || "idle"} — ${url}`);
+    }
+
+    /* ── REAL HTTP CALLS ── */
+
+    // Sort/Search → open-meteo geocoding (free, no key needed)
+    async function http_searchCatalog(query) {
+      const term = query || "electronics";
+      const url  = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=1&language=en&format=json`;
+      setLog("loading", url, "");
+      try {
+        const res = await fetch(url);
+        setLog("ok", url, `${res.status} ${res.statusText}`);
+      } catch {
+        setLog("error", url, "Network error");
+      }
+    }
+
+    // Card click → intentionally non-existent domain (for Playwright route mocking)
+    async function http_getProductDetail(id) {
+      const url = `https://api.techshop-inventory.invalid/products/${id}`;
+      setLog("loading", url, "");
+      try {
+        const res = await fetch(url);
+        setLog("ok", url, `${res.status} ${res.statusText}`);
+      } catch {
+        setLog("error", url, "ERR_NAME_NOT_RESOLVED");
+      }
+    }
+
+    /* ── DOM REFS ── */
+    const searchInput    = document.getElementById("search-input");
+    const sortSelect     = document.getElementById("sort-select");
+    const productsGrid   = document.getElementById("products-grid");
+    const productsStatus = document.getElementById("products-status");
+    const detailSection  = document.getElementById("detail-section");
+    const detailTitle    = document.getElementById("detail-title");
+    const detailTbody    = document.getElementById("detail-tbody");
+    const detailLoading  = document.getElementById("detail-loading-msg");
+    const btnClose       = document.getElementById("btn-close-detail");
+
+    let selectedId   = null;
+    let lastCardFocus = null; // element to return focus to on close
+
+    /* ── STOCK TAG ── */
+    function stockTag(n) {
+      if (n === 0) return { html: `<span class="tag out-stock" aria-label="Out of stock">Out of stock</span>`, text: "Out of stock" };
+      if (n <= 10) return { html: `<span class="tag low-stock" aria-label="Low stock, ${n} remaining">Low (${n})</span>`, text: `Low stock, ${n} remaining` };
+      return     { html: `<span class="tag in-stock"  aria-label="In stock">In stock</span>`, text: "In stock" };
+    }
+
+    /* ── RENDER GRID ── */
+    function applyFiltersAndRender() {
+      const q    = searchInput.value.trim().toLowerCase();
+      const sort = sortSelect.value;
+      let list   = PRODUCTS.filter(p => !q || p.title.toLowerCase().includes(q));
+      if (sort === "price-asc")  list.sort((a,b) => a.price - b.price);
+      if (sort === "price-desc") list.sort((a,b) => b.price - a.price);
+      if (sort === "name-asc")   list.sort((a,b) => a.title.localeCompare(b.title));
+      if (sort === "name-desc")  list.sort((a,b) => b.title.localeCompare(a.title));
+
+      // Update visible + sr status
+      const countMsg = q
+        ? `${list.length} product${list.length !== 1 ? "s" : ""} found for "${searchInput.value.trim()}"`
+        : `${list.length} product${list.length !== 1 ? "s" : ""} available`;
+      productsStatus.textContent = countMsg;
+      announce(countMsg);
+
+      if (!list.length) {
+        productsGrid.setAttribute("aria-busy", "false");
+        productsGrid.innerHTML = `<p class="empty" role="status">No products match your search.</p>`;
+        return;
+      }
+
+      productsGrid.setAttribute("aria-busy", "false");
+      productsGrid.innerHTML = list.map((p, i) => {
+        const st    = stockTag(p.stock);
+        const isSelected = p.id === selectedId;
+        return `
+          <button
+            class="product"
+            role="listitem"
+            data-id="${p.id}"
+            data-testid="product-card"
+            aria-pressed="${isSelected}"
+            aria-label="${p.title}, ${p.category}, $${p.price}, ${st.text}"
+            style="animation-delay:${i*40}ms"
+          >
+            <span class="category" aria-hidden="true">${p.category}</span>
+            <span class="title"    aria-hidden="true">${p.title}</span>
+            <span class="price"    aria-hidden="true">$${p.price}</span>
+            <span class="stock-label" aria-hidden="true">${st.html}</span>
+          </button>`;
+      }).join("");
+
+      productsGrid.querySelectorAll(".product").forEach(card =>
+        card.addEventListener("click", () => onSelectProduct(Number(card.dataset.id), card))
+      );
+    }
+
+    /* ── SKELETON ROWS ── */
+    function skeletonRows() {
+      const fields = ["SKU","Brand","Price","Category","Stock","Warehouse","Warranty","Weight","Color","Interface"];
+      return fields.map(f => `
+        <tr>
+          <td data-testid="detail-field" scope="row">${f}</td>
+          <td data-testid="detail-value">
+            <span class="skel" style="width:${70+Math.random()*80}px" aria-hidden="true"></span>
+            <span class="sr-only">Loading…</span>
+          </td>
+        </tr>`).join("");
+    }
+
+    /* ── RENDER DETAIL TABLE ── */
+    function renderDetailRows(p, weather) {
+      const ex = EXTRA[p.id];
+      const sc = p.stock === 0 ? "out-stock" : p.stock <= 10 ? "low-stock" : "in-stock";
+      const sl = p.stock === 0 ? "Out of stock" : p.stock <= 10 ? `Low (${p.stock})` : `In stock (${p.stock})`;
+      const rows = [
+        ["SKU",       `<code>${ex.sku}</code>`],
+        ["Brand",     ex.brand],
+        ["Price",     `<strong style="color:var(--accent)" aria-label="Price: $${p.price}">$${p.price}</strong>`],
+        ["Category",  p.category],
+        ["Stock",     `<span class="tag ${sc}" aria-label="${sl}">${sl}</span>`],
+        ["Warehouse",  weather
+          ? `${weather.city} — ${weather.temp}°C, ${weather.desc}`
+          : `<span style="color:var(--danger)" aria-label="Warehouse location unavailable">Unavailable (network error)</span>`],
+        ["Warranty",  ex.warranty],
+        ["Weight",    ex.weight],
+        ["Color",     ex.color],
+        ["Interface", ex.interface],
+      ];
+      return rows.map(([field, value]) => `
+        <tr>
+          <td data-testid="detail-field" scope="row">${field}</td>
+          <td data-testid="detail-value">${value}</td>
+        </tr>`).join("");
+    }
+
+    /* ── SELECT PRODUCT ── */
+    async function onSelectProduct(id, triggerEl) {
+      if (selectedId === id) return;
+      selectedId = id;
+      lastCardFocus = triggerEl || null;
+
+      // Update aria-pressed on all cards
+      productsGrid.querySelectorAll(".product").forEach(c => {
+        const pressed = Number(c.dataset.id) === id;
+        c.setAttribute("aria-pressed", String(pressed));
+      });
+
+      const product = PRODUCTS.find(p => p.id === id);
+
+      // Show panel with skeleton + busy state
+      detailTitle.textContent = product.title;
+      detailLoading.textContent = "Loading product details…";
+      detailTbody.setAttribute("aria-busy", "true");
+      detailTbody.innerHTML = skeletonRows();
+      detailSection.classList.add("visible");
+      announce(`Loading details for ${product.title}`);
+      detailSection.scrollIntoView({ behavior:"smooth", block:"nearest" });
+
+      // Move focus into the panel so keyboard users know it opened
+      btnClose.focus();
+
+      // Real HTTP call (non-existent domain — for Playwright route interception)
+      await http_getProductDetail(id);
+
+      // Real weather call (open-meteo, warehouse location)
+      let weather = null;
+      try {
+        const wUrl = `https://api.open-meteo.com/v1/forecast?latitude=${product.lat}&longitude=${product.lon}&current_weather=true`;
+        const wRes = await fetch(wUrl);
+        const wJson = await wRes.json();
+        const wc = wJson.current_weather;
+        const desc = wc.weathercode <= 1 ? "Clear" : wc.weathercode <= 3 ? "Cloudy" : wc.weathercode <= 67 ? "Rain" : "Snow";
+        weather = { city: CITIES[id] || "Unknown", temp: wc.temperature, desc };
+      } catch { /* leave null */ }
+
+      detailTbody.setAttribute("aria-busy", "false");
+      detailTbody.innerHTML = renderDetailRows(product, weather);
+      detailLoading.textContent = "";
+      announce(`Details loaded for ${product.title}`);
+    }
+
+    /* ── CLOSE DETAIL ── */
+    function closeDetail() {
+      selectedId = null;
+      detailSection.classList.remove("visible");
+      detailLoading.textContent = "";
+      productsGrid.querySelectorAll(".product").forEach(c =>
+        c.setAttribute("aria-pressed", "false")
+      );
+      setLog("", "Idle — waiting for interaction", "");
+      announce("Product detail panel closed");
+      // Return focus to the card that triggered the panel
+      if (lastCardFocus) lastCardFocus.focus();
+    }
+
+    /* ── KEYBOARD: close panel with Escape ── */
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape" && detailSection.classList.contains("visible")) {
+        closeDetail();
+      }
+    });
+
+    /* ── EVENTS ── */
+    let debounce;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(async () => {
+        productsGrid.setAttribute("aria-busy", "true");
+        await http_searchCatalog(searchInput.value.trim());
+        applyFiltersAndRender();
+      }, 400);
+    });
+
+    sortSelect.addEventListener("change", async () => {
+      productsGrid.setAttribute("aria-busy", "true");
+      await http_searchCatalog(sortSelect.value);
+      applyFiltersAndRender();
+    });
+
+    btnClose.addEventListener("click", closeDetail);
+
+    /* ── INIT ── */
+    applyFiltersAndRender();
+    setLog("", "Idle — waiting for interaction", "");
+  </script>
+</body>
+</html>
