@@ -9,6 +9,6 @@ export default class TechShopPage {
   }
   public static products = (page: Page) => {
     return page.getByRole('list').and(page.getByLabel("Product catalogue"))
-      .getByRole('listitem');
+      .getByTestId('product-card');
   }
 }
