@@ -1,0 +1,45 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "name": "DEV Playwright",
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "test",
+        "--",
+        "${fileBasename}"
+      ],
+      "env": {
+        "ENV": "dev",
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "name": "QA Playwright",
+      "console": "integratedTerminal",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "test",
+        "--",
+        "${fileBasename}"
+      ],
+      "env": {
+        "ENV": "qa",
+      }
+    },
+  ]
+}

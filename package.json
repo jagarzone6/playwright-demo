@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test-dev": "cross-env ENV=dev playwright test --config ./playwright.config.ts --workers=1 --headed --project=\"chromium\""
+    "test": "playwright test --config ./playwright.config.ts --workers=1 --headed --project=\"chromium\"",
+    "test-dev": "cross-env ENV=dev && npm run test"
   },
   "repository": {
     "type": "git",
