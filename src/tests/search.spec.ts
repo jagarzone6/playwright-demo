@@ -2,7 +2,7 @@ import TechShopPage from '../pages/tech-shop-page';
 import { test, expect } from '../fixtures/fixtures';
 import { Page } from '@playwright/test';
 
-test('Search for Products', async ({ techShopSite }) => {
+test('Search for Products', async ({ techShopPage: techShopSite }) => {
   //await searchProduct(techShopSite, "Key")
   await searchProductAlternative(techShopSite, "Key")
 });

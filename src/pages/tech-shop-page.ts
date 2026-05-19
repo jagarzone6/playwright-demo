@@ -11,4 +11,7 @@ export default class TechShopPage {
     return page.getByRole('list').and(page.getByLabel("Product catalogue"))
       .getByTestId('product-card');
   }
+  public static sortBy = (page: Page) => {
+    return page.getByLabel("Sort products");
+  }
 }
