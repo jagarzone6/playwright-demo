@@ -36,6 +36,8 @@ export default defineConfig({
   },
 
   globalSetup: './global-setup',
+
+  timeout: 5 * 60 * 1000,
   
   /* Configure projects for major browsers */
   projects: [
